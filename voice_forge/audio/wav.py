@@ -50,7 +50,8 @@ def resample(audio: Audio, src_sr: int, dst_sr: int = SAMPLE_RATE) -> Audio:
     n_out = max(1, round(duration * dst_sr))
     x_old = np.linspace(0.0, duration, num=len(audio), endpoint=False)
     x_new = np.linspace(0.0, duration, num=n_out, endpoint=False)
-    return np.interp(x_new, x_old, audio).astype(np.float32)
+    out: Audio = np.asarray(np.interp(x_new, x_old, audio), dtype=np.float32)
+    return out
 
 
 def load_for_stt(path: Path) -> Audio:
