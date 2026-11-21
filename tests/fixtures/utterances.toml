@@ -1,0 +1,353 @@
+# Spoken phrase -> expected intent, resolved against a Python project context
+# (branch "main" tracking "origin/main", pytest and ruff installed).
+# Includes typical Whisper mistakes. Used by tests/unit/test_rules.py.
+
+# ---------------------------------------------------------------- tests
+[[case]]
+text = "corre los tests"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "Corre los tests, por favor."
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "ejecuta las pruebas"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "run the tests"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "run tests please"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "tests"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "corre los test"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "pasa los tests"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "py test"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "corre los tests fallidos"
+kind = "execute"
+argv = ["pytest", "-q", "--lf"]
+[[case]]
+text = "rerun failed tests"
+kind = "execute"
+argv = ["pytest", "-q", "--lf"]
+[[case]]
+text = "corre los tests del parser"
+kind = "execute"
+argv = ["pytest", "-q", "-k", "parser"]
+[[case]]
+text = "run the tests for intent rules"
+kind = "execute"
+argv = ["pytest", "-q", "-k", "intent and rules"]
+[[case]]
+text = "corre el linter"
+kind = "execute"
+argv = ["ruff", "check", "."]
+
+# ---------------------------------------------------------------- git: read only
+[[case]]
+text = "estado de git"
+kind = "execute"
+argv = ["git", "status", "--short", "--branch"]
+[[case]]
+text = "Estado del git."
+kind = "execute"
+argv = ["git", "status", "--short", "--branch"]
+[[case]]
+text = "git status"
+kind = "execute"
+argv = ["git", "status", "--short", "--branch"]
+[[case]]
+text = "guitar status"
+kind = "execute"
+argv = ["git", "status", "--short", "--branch"]
+[[case]]
+text = "eh, estado de git"
+kind = "execute"
+argv = ["git", "status", "--short", "--branch"]
+[[case]]
+text = "show git status"
+kind = "execute"
+argv = ["git", "status", "--short", "--branch"]
+[[case]]
+text = "estado del repo"
+kind = "execute"
+argv = ["git", "status", "--short", "--branch"]
+[[case]]
+text = "¿qué ha cambiado?"
+kind = "execute"
+argv = ["git", "status", "--short", "--branch"]
+[[case]]
+text = "muestra el diff"
+kind = "execute"
+argv = ["git", "diff", "--stat"]
+[[case]]
+text = "git diff"
+kind = "execute"
+argv = ["git", "diff", "--stat"]
+[[case]]
+text = "show me the diff"
+kind = "execute"
+argv = ["git", "diff", "--stat"]
+[[case]]
+text = "muestra el log"
+kind = "execute"
+argv = ["git", "log", "--oneline", "-n", "10"]
+[[case]]
+text = "últimos cinco commits"
+kind = "execute"
+argv = ["git", "log", "--oneline", "-n", "5"]
+[[case]]
+text = "last 3 commits"
+kind = "execute"
+argv = ["git", "log", "--oneline", "-n", "3"]
+[[case]]
+text = "¿En qué rama estoy?"
+kind = "execute"
+argv = ["git", "branch", "--show-current"]
+[[case]]
+text = "what branch am I on"
+kind = "execute"
+argv = ["git", "branch", "--show-current"]
+[[case]]
+text = "lista las ramas"
+kind = "execute"
+argv = ["git", "branch", "--list"]
+
+# ---------------------------------------------------------------- git: branches
+[[case]]
+text = "crea rama feature barra login"
+kind = "execute"
+argv = ["git", "switch", "-c", "feature/login"]
+[[case]]
+text = "crea una nueva rama llamada fix parser"
+kind = "execute"
+argv = ["git", "switch", "-c", "fix-parser"]
+[[case]]
+text = "create branch hotfix dash auth"
+kind = "execute"
+argv = ["git", "switch", "-c", "hotfix-auth"]
+[[case]]
+text = "cambia a la rama main"
+kind = "execute"
+argv = ["git", "switch", "main"]
+[[case]]
+text = "switch to branch develop"
+kind = "execute"
+argv = ["git", "switch", "develop"]
+
+# ---------------------------------------------------------------- git: write
+[[case]]
+text = "agrega todo"
+kind = "execute"
+argv = ["git", "add", "-A"]
+[[case]]
+text = "add all changes"
+kind = "execute"
+argv = ["git", "add", "-A"]
+[[case]]
+text = "commit con mensaje arregla el parser"
+kind = "execute"
+argv = ["git", "commit", "-m", "Arregla el parser"]
+[[case]]
+text = "Haz commit con mensaje: Arreglé el análisis"
+kind = "execute"
+argv = ["git", "commit", "-m", "Arreglé el análisis"]
+[[case]]
+text = "commit with message fix the tokenizer"
+kind = "execute"
+argv = ["git", "commit", "-m", "Fix the tokenizer"]
+[[case]]
+text = "haz pull"
+kind = "execute"
+argv = ["git", "pull", "--ff-only"]
+[[case]]
+text = "trae los cambios"
+kind = "execute"
+argv = ["git", "pull", "--ff-only"]
+[[case]]
+text = "pull the latest changes"
+kind = "execute"
+argv = ["git", "pull", "--ff-only"]
+[[case]]
+text = "haz push"
+kind = "execute"
+argv = ["git", "push"]
+[[case]]
+text = "sube los cambios"
+kind = "execute"
+argv = ["git", "push"]
+[[case]]
+text = "push the changes"
+kind = "execute"
+argv = ["git", "push"]
+[[case]]
+text = "haz push forzado"
+kind = "execute"
+argv = ["git", "push", "--force-with-lease"]
+[[case]]
+text = "force push"
+kind = "execute"
+argv = ["git", "push", "--force-with-lease"]
+[[case]]
+text = "haz stash"
+kind = "execute"
+argv = ["git", "stash", "push"]
+[[case]]
+text = "recupera el stash"
+kind = "execute"
+argv = ["git", "stash", "pop"]
+[[case]]
+text = "reset hard"
+kind = "execute"
+argv = ["git", "reset", "--hard"]
+[[case]]
+text = "descarta los cambios"
+kind = "execute"
+argv = ["git", "reset", "--hard"]
+[[case]]
+text = "haz fetch"
+kind = "execute"
+argv = ["git", "fetch", "--all", "--prune"]
+
+# ---------------------------------------------------------------- tools / aliases
+[[case]]
+text = "abre cursor"
+kind = "execute"
+argv = ["cursor", "."]
+[[case]]
+text = "abre el proyecto en vs code"
+kind = "execute"
+argv = ["code", "."]
+[[case]]
+text = "abre el dashboard"
+kind = "execute"
+argv = ["swarm-pilot", "dashboard"]
+[[case]]
+text = "open the dashboard"
+kind = "execute"
+argv = ["swarm-pilot", "dashboard"]
+
+# ---------------------------------------------------------------- control
+[[case]]
+text = "sí"
+kind = "confirm"
+[[case]]
+text = "Confirmo."
+kind = "confirm"
+[[case]]
+text = "yes"
+kind = "confirm"
+[[case]]
+text = "dale"
+kind = "confirm"
+[[case]]
+text = "no"
+kind = "cancel"
+[[case]]
+text = "cancela"
+kind = "cancel"
+[[case]]
+text = "never mind"
+kind = "cancel"
+[[case]]
+text = "repite"
+kind = "meta"
+meta = "repeat"
+[[case]]
+text = "historial"
+kind = "meta"
+meta = "history"
+[[case]]
+text = "silencio"
+kind = "meta"
+meta = "mute"
+[[case]]
+text = "activa la voz"
+kind = "meta"
+meta = "unmute"
+[[case]]
+text = "ayuda"
+kind = "meta"
+meta = "help"
+[[case]]
+text = "salir"
+kind = "meta"
+meta = "quit"
+[[case]]
+text = "quit"
+kind = "meta"
+meta = "quit"
+[[case]]
+text = "commit"
+kind = "meta"
+meta = "say"
+
+# ---------------------------------------------------------------- delegation
+[[case]]
+text = "Claude, refactoriza el parser para usar dataclasses"
+kind = "delegate"
+prompt = "refactoriza el parser para usar dataclasses"
+[[case]]
+text = "Dile a Claude que agregue validación al config"
+kind = "delegate"
+prompt = "agregue validación al config"
+[[case]]
+text = "ask Claude to add type hints to the CLI"
+kind = "delegate"
+prompt = "add type hints to the CLI"
+[[case]]
+text = "Cloud, explica este error"
+kind = "delegate"
+prompt = "explica este error"
+[[case]]
+text = "Necesito que revises el módulo de audio porque cuando hablo muy bajo no detecta nada y se corta"
+kind = "delegate"
+prompt = "Necesito que revises el módulo de audio porque cuando hablo muy bajo no detecta nada y se corta"
+
+# ---------------------------------------------------------------- not understood
+[[case]]
+text = "algo raro aquí"
+kind = "unknown"
+[[case]]
+text = ""
+kind = "unknown"
+[[case]]
+text = "sí, pero espera"
+kind = "unknown"
+[[case]]
+text = "ok"
+kind = "unknown"
+[[case]]
+text = "el gato está en la mesa"
+kind = "unknown"
+
+# ---------------------------------------------------------------- real Whisper outputs (base model, SAPI5 voice)
+[[case]]
+text = "corre los testes"
+kind = "execute"
+argv = ["pytest", "-q"]
+[[case]]
+text = "acamit con mensaje a regla el parcer"
+kind = "execute"
+argv = ["git", "commit", "-m", "A regla el parcer"]
+[[case]]
+text = "push y forzado."
+kind = "execute"
+argv = ["git", "push", "--force-with-lease"]

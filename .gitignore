@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Caches / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local Whisper / Piper models (they live in the user cache dir, never in the repo)
+models/
+*.bin
+*.onnx
+*.onnx.json
+
+# Temporary audio (recordings, generated samples)
+*.wav
+!tests/fixtures/*.wav
+samples/
+
+# Local config, logs and secrets
+.voice-forge.local.toml
+*.log
+.env
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
