@@ -247,11 +247,11 @@ def test_delegation_llm_failure_falls_back(py_ctx: ContextSnapshot) -> None:
 
 
 def test_llm_delegate_is_not_rewritten_twice(py_ctx: ContextSnapshot) -> None:
-    llm = FakeLLM(['{"kind": "delegate", "prompt": "Explica el módulo de audio"}'])
+    llm = FakeLLM(['{"kind": "delegate", "prompt": "Documenta el módulo de audio"}'])
     intent = IntentEngine(RuleParser(), llm, lang="en").resolve("y eso del audio como va", py_ctx)
     assert intent.kind == IntentKind.DELEGATE and intent.source == "llm"
     assert len(llm.calls) == 1
-    assert (intent.prompt or "").startswith("## Task\nExplica el módulo de audio.")
+    assert (intent.prompt or "").startswith("## Task\nDocumenta el módulo de audio.")
 
 
 def test_intent_from_llm_validation() -> None:

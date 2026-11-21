@@ -13,6 +13,7 @@ from dataclasses import replace
 from typing import Any
 
 from voice_forge.core.types import ContextSnapshot, Intent, IntentKind
+from voice_forge.intent.classify import classify_request, clean_question
 from voice_forge.intent.llm import LLMBackend, LLMError, extract_json
 from voice_forge.intent.rules import RuleParser
 
@@ -138,6 +139,13 @@ class IntentEngine:
             intent = self._classify_with_llm(text, ctx) or intent
         if intent.kind == IntentKind.DELEGATE:
             request = intent.prompt or text
+            if classify_request(request, text) == "question":
+                # Questions go out clean: no file-editing template, no LLM rewrite.
+                return replace(
+                    intent, prompt=clean_question(request), delegate_kind="question",
+                    label="→ pregunta" if self.lang == "es" else "→ question",
+                )  # fmt: skip
+            intent = replace(intent, delegate_kind="code")
             if intent.source == "llm":  # already rewritten by the LLM: don't call it twice
                 prompt = build_prompt(request, ctx, self.lang)
             else:

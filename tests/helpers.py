@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from voice_forge.actions.answers import AnswerRecord
 from voice_forge.actions.delegate import Delegator
 from voice_forge.actions.executor import FakeRunner
 from voice_forge.actions.shield import Shield
@@ -60,6 +61,7 @@ class Rig:
     transcriber: FakeTranscriber
     copied: list[str] = field(default_factory=list)
     clock: FakeClock = field(default_factory=FakeClock)
+    answers: list[AnswerRecord] = field(default_factory=list)
 
 
 def make_rig(
@@ -72,6 +74,7 @@ def make_rig(
     target: str = "clipboard",
     runner: FakeRunner | None = None,
     confirm_timeout_s: float = 10.0,
+    answer_with_claude: bool = False,
 ) -> Rig:
     bus = RecordingBus()
     runner = runner or FakeRunner()
@@ -79,6 +82,7 @@ def make_rig(
     transcriber = FakeTranscriber(script)
     copied: list[str] = []
     clock = FakeClock()
+    answers: list[AnswerRecord] = []
     signal = utterance_audio() if audio is None else audio
     orch = Orchestrator(
         bus=bus,
@@ -88,12 +92,18 @@ def make_rig(
         engine=IntentEngine(RuleParser(DEFAULT_ALIASES), llm),
         shield=Shield(),
         runner=runner,
-        delegator=Delegator(target, runner, copy=copied.append),  # type: ignore[arg-type]
+        delegator=Delegator(
+            target,  # type: ignore[arg-type]
+            runner,
+            copy=copied.append,
+            answer_with_claude=answer_with_claude,
+        ),
         speaker=speaker,
         source_factory=lambda: ArraySource(signal),
         cwd=ctx.cwd,
         confirm_timeout_s=confirm_timeout_s,
         dry_run=dry_run,
         clock=clock,
+        answer_store=answers.append,
     )
-    return Rig(orch, bus, runner, speaker, transcriber, copied, clock)
+    return Rig(orch, bus, runner, speaker, transcriber, copied, clock, answers)

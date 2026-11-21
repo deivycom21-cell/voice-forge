@@ -161,3 +161,33 @@ def test_doctor_runs_without_hardware(monkeypatch: pytest.MonkeyPatch) -> None:
         "Parser de reglas",
     ):
         assert needle in res.output, needle
+
+
+def test_last_without_answers() -> None:
+    res = invoke("last")
+    assert res.exit_code == 1 and "no hay respuestas" in res.output
+
+
+def test_question_is_answered_and_last_shows_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    answer = "Un **VAD** detecta cuándo hablas.\n\nSegunda parte de la respuesta."
+    fake = FakeRunner(stdout=answer)
+    monkeypatch.setattr("voice_forge.app.SubprocessRunner", lambda: fake)
+    res = invoke("interpret", "Claude, ¿qué es un VAD?", "--target", "claude", "-x")
+    assert res.exit_code == 0, res.output
+    assert fake.calls[0]["input"] == "¿Qué es un VAD?"
+    assert "Segunda parte de la respuesta." in res.output
+    shown = invoke("last")
+    assert shown.exit_code == 0
+    assert "¿Qué es un VAD?" in shown.output and "Segunda parte de la respuesta." in shown.output
+    raw = invoke("last", "--raw")
+    assert raw.output.strip() == answer
+
+
+def test_question_with_llm_claude_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeRunner(stdout="Respuesta.")
+    monkeypatch.setattr("voice_forge.app.SubprocessRunner", lambda: fake)
+    monkeypatch.setattr("voice_forge.intent.llm.ClaudeCliBackend.available", lambda self: False)
+    res = invoke("interpret", "explícame el recorder", "--llm", "claude", "-x")
+    assert res.exit_code == 0, res.output
+    assert fake.calls[0]["argv"] == ("claude", "-p")
+    assert invoke("last", "--raw").output.strip() == "Respuesta."

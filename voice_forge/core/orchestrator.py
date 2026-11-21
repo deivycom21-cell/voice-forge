@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from voice_forge.actions.answers import AnswerRecord, spoken_summary
 from voice_forge.actions.confirm import ConfirmationFlow, Decision
 from voice_forge.actions.delegate import DelegationResult, Delegator
 from voice_forge.actions.executor import CommandRunner
@@ -60,6 +61,7 @@ class Orchestrator:
         command_timeout_s: float = 300.0,
         dry_run: bool = False,
         clock: Callable[[], float] = time.monotonic,
+        answer_store: Callable[[AnswerRecord], Any] | None = None,
     ) -> None:
         self.bus = bus
         self.recorder = recorder
@@ -78,6 +80,8 @@ class Orchestrator:
         self.command_timeout_s = command_timeout_s
         self.dry_run = dry_run
         self._clock = clock
+        self.answer_store = answer_store
+        self.last_answer: AnswerRecord | None = None
         self.pending: ConfirmationFlow | None = None
         self._pending_ctx: ContextSnapshot | None = None
         self.last_executed: Intent | None = None
@@ -256,9 +260,13 @@ class Orchestrator:
 
     def _delegate(self, intent: Intent, ctx: ContextSnapshot) -> TurnOutcome:
         prompt = intent.prompt or intent.utterance
+        question = intent.delegate_kind == "question"
         if self.dry_run:
-            self.bus.publish(ev.Delegated("print", prompt, True, "dry-run: no se envió"))
+            what = "pregunta no enviada" if question else "no se envió"
+            self.bus.publish(ev.Delegated("print", prompt, True, f"dry-run: {what}"))
             return self._finish(TurnOutcome("dry_run", intent.utterance, intent))
+        if question and self.delegator.can_answer:
+            return self._ask(intent, prompt, ctx)
         self._status(Status.EXECUTING)
         res = self.delegator.deliver(prompt, ctx.root)
         self.bus.publish(ev.Delegated(res.target, prompt, res.ok, res.detail))
@@ -277,6 +285,30 @@ class Orchestrator:
                 "delegated" if res.ok else "failed", intent.utterance, intent, delegation=res
             )
         )
+
+    def _ask(self, intent: Intent, question: str, ctx: ContextSnapshot) -> TurnOutcome:
+        """Send a clean question to ``claude -p``, wait, show and remember the answer."""
+        self._say("asking")
+        self._status(Status.THINKING)
+        res = self.delegator.ask(question, ctx.root)
+        self.bus.publish(ev.Answered(question, res.output if res.ok else "", res.ok, res.detail))
+        if not res.ok:
+            self._say("no_answer")
+            return self._finish(TurnOutcome("failed", intent.utterance, intent, delegation=res))
+        record = AnswerRecord.now(question, res.output, str(ctx.root))
+        self.last_answer = record
+        if self.answer_store is not None:
+            try:
+                self.answer_store(record)
+            except Exception as exc:  # never lose the answer on screen because of disk issues
+                log.exception("could not save last answer")
+                self.bus.publish(
+                    ev.ErrorEvent("answers", f"no se pudo guardar la respuesta: {exc}")
+                )
+        summary = spoken_summary(res.output)
+        if summary:
+            self._say(summary, raw=True)
+        return self._finish(TurnOutcome("answered", intent.utterance, intent, delegation=res))
 
     def _meta(self, intent: Intent, ctx: ContextSnapshot) -> TurnOutcome:
         action = intent.meta

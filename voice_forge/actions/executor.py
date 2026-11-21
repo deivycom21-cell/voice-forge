@@ -24,6 +24,7 @@ class CommandRunner(Protocol):
         timeout: float = 300.0,
         detached: bool = False,
         input: str | None = None,
+        full_output: bool = False,
     ) -> ActionResult: ...
 
 
@@ -64,6 +65,7 @@ class SubprocessRunner:
         timeout: float = 300.0,
         detached: bool = False,
         input: str | None = None,
+        full_output: bool = False,
     ) -> ActionResult:
         argv_t = tuple(argv)
         if not argv_t:
@@ -74,6 +76,7 @@ class SubprocessRunner:
                 argv_t, error=f"'{argv_t[0]}' no está instalado o no está en el PATH"
             )
         full = [exe, *argv_t[1:]]
+        limit = 10**9 if full_output else self.max_output_lines  # answers must not be truncated
         t0 = time.perf_counter()
         if detached:
             kwargs: dict[str, Any] = {
@@ -113,7 +116,7 @@ class SubprocessRunner:
                 else (exc.stdout or "")
             )
             return ActionResult(
-                argv_t, stdout=tail(out, self.max_output_lines), duration_s=time.perf_counter() - t0,
+                argv_t, stdout=tail(out, limit), duration_s=time.perf_counter() - t0,
                 error=f"tiempo agotado ({timeout:.0f}s)",
             )  # fmt: skip
         except OSError as exc:
@@ -121,8 +124,8 @@ class SubprocessRunner:
         return ActionResult(
             argv_t,
             returncode=proc.returncode,
-            stdout=tail(proc.stdout or "", self.max_output_lines),
-            stderr=tail(proc.stderr or "", self.max_output_lines),
+            stdout=tail(proc.stdout or "", limit),
+            stderr=tail(proc.stderr or "", limit),
             duration_s=time.perf_counter() - t0,
         )
 
@@ -149,10 +152,18 @@ class FakeRunner:
         timeout: float = 300.0,
         detached: bool = False,
         input: str | None = None,
+        full_output: bool = False,
     ) -> ActionResult:
         argv_t = tuple(argv)
         self.calls.append(
-            {"argv": argv_t, "cwd": cwd, "timeout": timeout, "detached": detached, "input": input}
+            {
+                "argv": argv_t,
+                "cwd": cwd,
+                "timeout": timeout,
+                "detached": detached,
+                "input": input,
+                "full_output": full_output,
+            }
         )
         if argv_t in self.results:
             return self.results[argv_t]

@@ -95,10 +95,11 @@ def make_printer(out: Console) -> Any:
                 out.print(
                     f"[{color}]$ {' '.join(i.argv)}[/{color}]  [grey50]({i.source}, {i.name})[/grey50]"
                 )
+            elif i.kind == IntentKind.DELEGATE:
+                what = "pregunta" if i.delegate_kind == "question" else "orden de código"
+                out.print(f"[cyan]→ agente ({what})[/cyan]")
             else:
-                out.print(
-                    f"[cyan]{i.kind.value}[/cyan] {i.display if i.kind != IntentKind.DELEGATE else ''}"
-                )
+                out.print(f"[cyan]{i.kind.value}[/cyan] {i.display}")
             if event.reasons:
                 out.print(f"[dark_orange]riesgo: {'; '.join(event.reasons)}[/dark_orange]")
         elif isinstance(event, ev.ActionFinished):
@@ -114,6 +115,15 @@ def make_printer(out: Console) -> Any:
         elif isinstance(event, ev.Delegated):
             out.print(Syntax(event.prompt, "markdown", theme="ansi_dark", word_wrap=True))
             out.print(("[green]✓[/green] " if event.ok else "[red]✗[/red] ") + event.detail)
+        elif isinstance(event, ev.Answered):
+            from voice_forge.ui.hud import answer_panel
+
+            out.print(f"[cyan]pregunta:[/cyan] {event.question}", highlight=False)
+            if event.ok:
+                out.print(answer_panel(event.answer))
+                out.print(f"[green]✓[/green] {event.detail}")
+            else:
+                out.print(f"[red]✗[/red] {event.detail}")
         elif isinstance(event, ev.Blocked):
             out.print(f"[red]⛔ bloqueado:[/red] {'; '.join(event.reasons)}")
         elif isinstance(event, ev.ConfirmationRequested):
@@ -288,6 +298,38 @@ def interpret(
         outcome = orch.handle_text("confirmo" if answer else "no")
     if outcome.status in ("error", "failed"):
         raise typer.Exit(1)
+
+
+# --------------------------------------------------------------------------- last answer
+
+
+@app.command()
+def last(
+    raw: Annotated[
+        bool, typer.Option("--raw", help="Solo el texto de la respuesta (para tuberías).")
+    ] = False,
+) -> None:
+    """Muestra la última respuesta de Claude · Show the last answer from Claude."""
+    from rich.markdown import Markdown
+
+    from voice_forge.actions.answers import last_answer_path, load_last_answer
+
+    record = load_last_answer()
+    if record is None:
+        err.print(
+            "[yellow]Todavía no hay respuestas guardadas.[/yellow] Haz una pregunta con "
+            '[bold]--target claude[/bold] o [bold]--llm claude[/bold], p. ej. "Claude, ¿qué es un VAD?"'
+        )
+        raise typer.Exit(1)
+    if raw:
+        typer.echo(record.answer)
+        return
+    console.print(f"[cyan]pregunta:[/cyan] {record.question}", highlight=False)
+    meta = " · ".join(x for x in (record.created_at, record.cwd) if x)
+    if meta:
+        console.print(f"[grey50]{meta}[/grey50]", highlight=False)
+    console.print(Markdown(record.answer))
+    console.print(f"[grey50]{last_answer_path()}[/grey50]", highlight=False)
 
 
 # --------------------------------------------------------------------------- models

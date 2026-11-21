@@ -83,10 +83,14 @@ def test_4_delegate_to_clipboard_with_context(py_ctx: ContextSnapshot) -> None:
 
 
 def test_4b_delegate_to_claude_via_stdin(py_ctx: ContextSnapshot) -> None:
-    rig = make_rig(py_ctx, ["dile a claude que explique el VAD"], target="claude")
+    rig = make_rig(py_ctx, ["dile a claude que documente el VAD"], target="claude")
     rig.orch.listen_once()
     call = rig.runner.calls[0]
-    assert call["argv"] == ("claude", "-p") and "Explique el VAD." in call["input"]
+    assert (
+        call["argv"] == ("claude", "-p")
+        and "Documente el VAD." in call["input"]
+        and "## Tarea" in call["input"]
+    )
     assert rig.speaker.said == ["Enviado a Claude"]
 
 
@@ -262,3 +266,91 @@ def test_run_loop_expires_pending_and_honours_stop(py_ctx: ContextSnapshot) -> N
     stop.set()
     thread.join(5)
     assert not thread.is_alive() and rig.orch.pending is None and rig.runner.calls == []
+
+
+# --------------------------------------------------------------------------- questions answered by claude -p
+
+ANSWER = "Un VAD (detector de actividad de voz) decide cuándo hay habla. Aquí corta la grabación.\n\n- usa RMS\n- calibra el ruido"
+
+
+def test_question_with_target_claude_is_answered(py_ctx: ContextSnapshot) -> None:
+    from voice_forge.actions.executor import FakeRunner
+
+    rig = make_rig(
+        py_ctx, ["Claude, ¿qué es un VAD?"], target="claude", runner=FakeRunner(stdout=ANSWER)
+    )
+    out = rig.orch.listen_once()
+    assert out.status == "answered"
+    call = rig.runner.calls[0]
+    assert call["argv"] == ("claude", "-p") and call["full_output"] is True
+    assert call["input"] == "¿Qué es un VAD?"  # clean: no edit template, no repo context
+    answered = rig.bus.of_type(ev.Answered)[0]
+    assert answered.ok and answered.answer == ANSWER and answered.question == "¿Qué es un VAD?"
+    assert rig.speaker.said == [
+        "Preguntando a Claude",
+        "Un VAD (detector de actividad de voz) decide cuándo hay habla.",
+    ]
+    assert len(rig.answers) == 1 and rig.answers[0].answer == ANSWER
+    assert rig.answers[0].cwd == str(py_ctx.root)
+    assert rig.orch.last_answer == rig.answers[0]
+    statuses = [e.status for e in rig.bus.of_type(ev.StatusChanged)]
+    assert Status.THINKING in statuses and statuses[-1] == Status.IDLE
+
+
+def test_question_with_llm_claude_but_clipboard_target_is_answered(py_ctx: ContextSnapshot) -> None:
+    from voice_forge.actions.executor import FakeRunner
+
+    rig = make_rig(py_ctx, runner=FakeRunner(stdout=ANSWER), answer_with_claude=True)
+    assert rig.orch.handle_text("explícame el módulo de audio").status == "answered"
+    assert rig.runner.calls[0]["input"] == "Explícame el módulo de audio."
+    assert rig.copied == []
+
+
+def test_code_order_with_target_claude_keeps_template(py_ctx: ContextSnapshot) -> None:
+    rig = make_rig(py_ctx, target="claude")
+    assert rig.orch.handle_text("Claude, refactoriza el parser").status == "delegated"
+    call = rig.runner.calls[0]
+    assert call["input"].startswith("## Tarea\nRefactoriza el parser.") and not call["full_output"]
+    assert rig.bus.of_type(ev.Answered) == [] and rig.answers == []
+    assert rig.speaker.said == ["Enviado a Claude"]
+
+
+def test_question_without_claude_goes_clean_to_clipboard(py_ctx: ContextSnapshot) -> None:
+    rig = make_rig(py_ctx)
+    assert rig.orch.handle_text("Claude, ¿qué es un VAD?").status == "delegated"
+    assert rig.copied == ["¿Qué es un VAD?"] and rig.runner.calls == []
+
+
+def test_question_failure_is_reported_and_not_stored(py_ctx: ContextSnapshot) -> None:
+    from voice_forge.actions.executor import FakeRunner
+    from voice_forge.core.types import ActionResult
+
+    failing = FakeRunner(
+        {("claude", "-p"): ActionResult(("claude", "-p"), returncode=1, stderr="auth")}
+    )
+    rig = make_rig(py_ctx, target="claude", runner=failing)
+    assert rig.orch.handle_text("¿qué es un VAD?").status == "failed"
+    answered = rig.bus.of_type(ev.Answered)[0]
+    assert not answered.ok and answered.answer == ""
+    assert rig.answers == [] and rig.speaker.said[-1] == "Claude no respondió"
+
+
+def test_question_store_failure_does_not_hide_answer(py_ctx: ContextSnapshot) -> None:
+    from voice_forge.actions.executor import FakeRunner
+
+    rig = make_rig(py_ctx, target="claude", runner=FakeRunner(stdout=ANSWER))
+
+    def broken(_: object) -> None:
+        raise OSError("disk full")
+
+    rig.orch.answer_store = broken
+    assert rig.orch.handle_text("¿qué es un VAD?").status == "answered"
+    assert rig.bus.of_type(ev.ErrorEvent)[0].where == "answers"
+    assert rig.speaker.said[-1].startswith("Un VAD")
+
+
+def test_question_dry_run_is_not_sent(py_ctx: ContextSnapshot) -> None:
+    rig = make_rig(py_ctx, target="claude", dry_run=True)
+    assert rig.orch.handle_text("¿qué es un VAD?").status == "dry_run"
+    assert rig.runner.calls == []
+    assert "pregunta no enviada" in rig.bus.of_type(ev.Delegated)[0].detail

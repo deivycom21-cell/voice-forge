@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 IntentSource = Literal["rules", "llm", "alias"]
+DelegateKind = Literal["code", "question"]
 
 
 class IntentKind(str, Enum):
@@ -60,6 +61,7 @@ class Intent:
     detached: bool = False
     confirm: bool = False
     shell: bool = False
+    delegate_kind: DelegateKind = "code"  # DELEGATE only: code change vs. question to answer
 
     @property
     def display(self) -> str:

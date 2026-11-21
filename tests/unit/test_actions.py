@@ -145,3 +145,46 @@ def test_delegate_to_claude_json_and_errors(tmp_path: Path) -> None:
 def test_delegate_print(tmp_path: Path) -> None:
     res = Delegator("print", FakeRunner()).deliver("hola", tmp_path)
     assert res.ok and res.output == "hola"
+
+
+# --------------------------------------------------------------------------- questions (ask)
+
+
+def test_can_answer() -> None:
+    assert Delegator("claude", FakeRunner()).can_answer
+    assert Delegator("clipboard", FakeRunner(), answer_with_claude=True).can_answer
+    assert not Delegator("clipboard", FakeRunner()).can_answer
+    assert not Delegator("print", FakeRunner()).can_answer
+
+
+def test_ask_sends_clean_question_via_stdin_and_keeps_full_output(tmp_path: Path) -> None:
+    long_answer = "\n".join(f"línea {i}" for i in range(200))
+    runner = FakeRunner(stdout=long_answer + "\n")
+    res = Delegator("claude", runner, claude_args=["--model", "haiku"]).ask(
+        "¿Qué es un VAD?", tmp_path
+    )
+    call = runner.calls[0]
+    assert call["argv"] == ("claude", "-p", "--model", "haiku")
+    assert call["input"] == "¿Qué es un VAD?" and call["full_output"] is True
+    assert res.ok and res.output == long_answer
+    assert "voice-forge last" in res.detail
+
+
+def test_ask_errors(tmp_path: Path) -> None:
+    empty = Delegator("claude", FakeRunner(stdout="   \n")).ask("q", tmp_path)
+    assert not empty.ok and "ninguna respuesta" in empty.detail
+    missing = FakeRunner({("claude", "-p"): ActionResult(("claude", "-p"), error="no instalado")})
+    assert Delegator("claude", missing).ask("q", tmp_path).detail == "no instalado"
+    json_out = FakeRunner(stdout=json.dumps({"result": "Respuesta."}))
+    res = Delegator("claude", json_out, claude_args=["--output-format", "json"]).ask("q", tmp_path)
+    assert res.output == "Respuesta."
+
+
+def test_subprocess_runner_full_output_is_not_truncated(tmp_path: Path) -> None:
+    code = "print('\\n'.join(str(i) for i in range(100)))"
+    short = SubprocessRunner(max_output_lines=5).run([PY, "-c", code], cwd=tmp_path)
+    assert "omitidas" in short.stdout
+    full = SubprocessRunner(max_output_lines=5).run(
+        [PY, "-c", code], cwd=tmp_path, full_output=True
+    )
+    assert full.stdout.splitlines() == [str(i) for i in range(100)]

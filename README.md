@@ -74,6 +74,7 @@ voice-forge listen --from-wav orden.wav      # procesa un archivo en vez del mic
 voice-forge interpret "corre los tests"      # prueba la gramática escribiendo (dry-run)
 voice-forge interpret "estado de git" -x     # …y ejecútalo de verdad
 voice-forge doctor --bench                   # mide carga del modelo, latencia y memoria
+voice-forge last                             # última respuesta de Claude a una pregunta
 voice-forge config show | init | set stt.model tiny | edit
 ```
 
@@ -101,15 +102,35 @@ voice-forge config show | init | set stt.model tiny | edit
 | "abre el dashboard" | `swarm-pilot dashboard` (alias editable) |
 | "**Claude,** agrega validación al config" | prompt estructurado → portapapeles / `claude -p` |
 | "dile a Claude que…" · "agente…" | ídem |
+| "Claude, ¿qué es un VAD?" · "explícame el recorder" · "resume los cambios" | pregunta → `claude -p` → respuesta en pantalla + voz + `voice-forge last` |
 | "confirmo" / "cancela" | responde a una confirmación |
 | "repite" · "historial" · "silencio" · "ayuda" · "salir" | control de voice-forge |
 
 Las frases largas que no encajan en ninguna regla se tratan como petición al agente. La gramática tolera
 errores típicos de Whisper ("guitar status", "corre los testes", "acamit con mensaje…").
 
-### Delegación a agentes
+### Delegación a agentes: órdenes y preguntas
 
-Cuando le hablas a Claude, voice-forge construye un prompt así (sin IA, de forma determinista):
+voice-forge distingue dos tipos de petición (de forma determinista, sin IA):
+
+| Tipo | Ejemplos | Qué pasa |
+|---|---|---|
+| **Orden de código** | "Claude, crea…", "arregla…", "refactoriza…", "add…", "fix…" | Prompt con plantilla de edición + contexto del repo → destino configurado |
+| **Pregunta / explicación** | "Claude, ¿qué es…?", "explícame…", "resume…", "pregúntale a Claude si…", "what is…", "explain…" | Pregunta **limpia** (sin plantilla) → `claude -p` → respuesta completa en el panel `salida` + resumen hablado de la primera frase |
+
+Las preguntas se responden con `claude -p` cuando usas `--target claude` **o** `--llm claude`. Sin ninguno de los
+dos, la pregunta limpia va al portapapeles. "Explícame el bug y arréglalo" cuenta como orden.
+
+```bash
+voice-forge listen --target claude      # "Claude, ¿cómo funciona el recorder?"
+voice-forge last                        # vuelve a mostrar la última respuesta (markdown)
+voice-forge last --raw | less           # solo el texto, para tuberías
+```
+
+La última respuesta se guarda en tu carpeta de datos de usuario (`last_answer.json`). Si es más larga que la
+terminal, el HUD la imprime completa encima del panel en vivo para que no se recorte.
+
+Para las **órdenes de código**, voice-forge construye un prompt así:
 
 ```markdown
 ## Tarea
@@ -229,6 +250,14 @@ Set `intent.ui_language = "en"` and `stt.language = "en"` (or `"auto"`) for Engl
 "**Claude,** add type hints to the CLI" · "ask Claude to …" · "confirm" / "cancel" · "repeat" · "history" ·
 "mute" · "quit".
 
+### Code orders vs. questions
+
+- **Code orders** ("Claude, create…", "fix…", "refactor…") get the edit template with repo/git context and go to
+  the configured target (`clipboard`, `claude`, `print`).
+- **Questions** ("Claude, what is…?", "explain…", "summarize…", "how does…") are sent **clean** (no template) to
+  `claude -p` when you use `--target claude` **or** `--llm claude`. The full answer appears in the `salida` panel,
+  the first sentence is read aloud, and `voice-forge last` (or `voice-forge last --raw`) shows it again.
+
 ### Privacy
 
 Audio never leaves your machine. The only network access is `voice-forge models download`. Ollama is
@@ -243,7 +272,7 @@ git clone https://github.com/deivycom21-cell/voice-forge.git
 cd voice-forge
 python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-pytest                    # ~370 deterministic tests: no microphone, model, LLM or network
+pytest                    # ~440 deterministic tests: no microphone, model, LLM or network
 pytest -m model           # optional: real Whisper model + system TTS voice
 ruff check . && ruff format --check . && mypy voice_forge
 python scripts/bench_intent.py

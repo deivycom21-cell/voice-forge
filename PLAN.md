@@ -424,7 +424,8 @@ Cada fase termina con: código + tests verdes en local + `ruff` limpio. Ninguna 
 | 12 HUD | ✅ | Los tests comprueban fragmentos del render en texto plano en vez de snapshots completos (más robusto entre terminales). |
 | 13 Orquestador | ✅ | Los 6 escenarios del plan y 13 más (bucle real con trigger, expiración, repeat re-evaluado por el escudo…). |
 | 14 CLI | ✅ | Comando extra `interpret "frase" [-x]` para probar la gramática escribiendo. |
-| 15 Docs + release | ✅ | README bilingüe, CHANGELOG, scripts (`bench_intent.py`, `record_sample.py`, `gen_samples.py` en lugar de `gen_fixtures.py`). Pendiente del mantenedor: crear el repo, subirlo y etiquetar `v0.1.0`. |
+| 15 Docs + release | ✅ | README bilingüe, CHANGELOG, scripts (`bench_intent.py`, `record_sample.py`, `gen_samples.py` en lugar de `gen_fixtures.py`). Publicado en GitHub con el tag `v0.1.0`. |
+| 16 Órdenes vs. preguntas | ✅ | `intent/classify.py` (determinista). Las preguntas van limpias a `claude -p` (`--target claude` o `--llm claude`), la respuesta completa aparece en el panel `salida`, se lee la primera frase por TTS y `voice-forge last` la recupera (`actions/answers.py`). |
 
 ### Mediciones reales (Windows 11, CPU, modelo `base` int8)
 
@@ -437,5 +438,5 @@ Cada fase termina con: código + tests verdes en local + `ruff` limpio. Ninguna 
 
 ### Calidad
 
-- 370 tests deterministas (+3 opcionales con modelo real), ~92% de cobertura.
+- 444 tests deterministas (+3 opcionales con modelo real).
 - `ruff check`, `ruff format --check` y `mypy --strict` sin errores.

@@ -16,6 +16,9 @@ def _isolate_user_dirs(
     home = tmp_path_factory.mktemp("userdirs")
     monkeypatch.setattr("voice_forge.config.global_config_path", lambda: home / "config.toml")
     monkeypatch.setattr("voice_forge.stt.models.models_dir", lambda: home / "models")
+    monkeypatch.setattr(
+        "voice_forge.actions.answers.last_answer_path", lambda: home / "last_answer.json"
+    )
 
 
 @pytest.fixture

@@ -205,3 +205,47 @@ def test_hud_live_wrapper_updates() -> None:
         hud(ev.LevelUpdate(-10))
     hud(ev.Info("after exit"))
     assert hud.state.message == "after exit"
+
+
+def test_hud_shows_complete_answer() -> None:
+    s = HudState(target="claude")
+    q = Intent(IntentKind.DELEGATE, prompt="¿Qué es un VAD?", delegate_kind="question")
+    s.apply(ev.IntentResolved(q, Risk.SAFE))
+    assert "→ pregunta: ¿Qué es un VAD?" in render_text(s)
+    answer = "\n\n".join(f"Párrafo número {i} de la respuesta." for i in range(25))
+    s.apply(ev.Answered("¿Qué es un VAD?", answer, True, "respuesta de claude"))
+    out = render_text(s, width=120)
+    assert "salida · respuesta de claude" in out
+    for i in range(25):  # nothing cut: unlike command output (last 10 lines)
+        assert f"Párrafo número {i} de la respuesta." in out
+    s.apply(ev.ActionStarted(Intent(IntentKind.EXECUTE, argv=("ls",))))
+    assert not s.answer
+
+
+def test_hud_failed_answer_and_cropped_view() -> None:
+    s = HudState()
+    s.apply(ev.Answered("q", "", False, "claude no devolvió ninguna respuesta"))
+    assert not s.answer and "ninguna respuesta" in render_text(s)
+    s.apply(ev.Answered("q", "\n".join(f"l{i}" for i in range(50)), True, "ok"))
+    s.output_max_lines = 5
+    out = render_text(s)
+    assert "l4" in out and "l5" not in out and "voice-forge last" in out
+
+
+def test_hud_prints_long_answers_to_scrollback() -> None:
+    import io
+
+    from rich.console import Console
+
+    buf = io.StringIO()
+    console = Console(file=buf, force_terminal=True, width=80, height=30)
+    hud = Hud(HudState(), console)
+    long_answer = "\n".join(f"Línea {i} de una respuesta muy larga" for i in range(80))
+    with hud:
+        hud(ev.Answered("q", long_answer, True, "ok"))
+        assert hud.state.output_max_lines is not None and hud.state.output_max_lines < 30
+    assert "Línea 79 de una respuesta muy larga" in buf.getvalue()  # complete in scrollback
+    short = Hud(HudState(), Console(file=io.StringIO(), force_terminal=True, width=80, height=40))
+    with short:
+        short(ev.Answered("q", "Respuesta corta.", True, "ok"))
+        assert short.state.output_max_lines is None  # fits: shown complete in the live panel

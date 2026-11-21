@@ -1,5 +1,21 @@
 # Changelog
 
+## Sin publicar / Unreleased
+
+### Añadido / Added
+- **Órdenes de código vs. preguntas:** clasificador determinista ES/EN (`intent/classify.py`).
+  Las órdenes ("crea", "arregla", "refactoriza"…) mantienen la plantilla con contexto del repo; las preguntas
+  ("explícame", "qué es", "resume", "explain", "what is"…) se envían limpias a `claude -p` con
+  `--target claude` o `--llm claude`.
+- Las preguntas también se reconocen sin el prefijo "Claude" ("explícame el recorder") y con "pregúntale a Claude si…".
+- La respuesta se muestra completa en el panel `salida` (markdown). Si no cabe en la terminal, se imprime
+  completa encima del HUD.
+- `voice-forge last [--raw]`: muestra la última respuesta, guardada en `last_answer.json` (escritura atómica).
+- La voz lee un resumen corto: la primera frase de la respuesta, sin markdown.
+
+### Cambiado / Changed
+- `CommandRunner.run()` acepta `full_output=True`; las respuestas de Claude ya no se recortan a 40 líneas.
+
 ## 0.1.0 — 2026-11-21
 
 Primera versión funcional / First working release.

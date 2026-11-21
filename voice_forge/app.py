@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+from voice_forge.actions.answers import AnswerRecord, save_last_answer
 from voice_forge.actions.delegate import Delegator, Target
 from voice_forge.actions.executor import CommandRunner, SubprocessRunner
 from voice_forge.actions.shield import Shield
@@ -110,6 +112,7 @@ def build_orchestrator(
     speaker: Speaker | None = None,
     runner: CommandRunner | None = None,
     probe: ContextProbe | None = None,
+    answer_store: Callable[[AnswerRecord], Any] | None = save_last_answer,
 ) -> Orchestrator:
     runner = runner or SubprocessRunner()
     lang = cfg.intent.ui_language
@@ -133,6 +136,8 @@ def build_orchestrator(
             runner,
             claude_args=cfg.delegate.claude_args,
             claude_timeout_s=cfg.delegate.claude_timeout_s,
+            # questions are answered by claude -p with --target claude OR --llm claude
+            answer_with_claude=cfg.llm.backend == "claude",
         ),
         speaker=speaker,
         source_factory=build_source_factory(cfg, from_wav),
@@ -142,4 +147,5 @@ def build_orchestrator(
         confirm_timeout_s=cfg.safety.confirm_timeout_s,
         command_timeout_s=cfg.safety.command_timeout_s,
         dry_run=dry_run,
+        answer_store=answer_store,
     )

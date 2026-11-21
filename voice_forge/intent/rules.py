@@ -23,6 +23,7 @@ from difflib import SequenceMatcher
 
 from voice_forge.config import AliasSpec
 from voice_forge.core.types import ContextSnapshot, Intent, IntentKind
+from voice_forge.intent.classify import QUESTION_OPENERS
 from voice_forge.intent.normalize import normalize, recover_original, to_int
 
 Builder = Callable[["Match"], Intent]
@@ -246,8 +247,14 @@ def _open_editor(m: Match) -> Intent:
 
 
 def _delegate(m: Match) -> Intent:
-    req = m.original(m.get("req", "req2", "req3", "req4") or m.norm)
+    req = m.original(m.get("req", "req2", "req3", "req4", "req5") or m.norm)
     return Intent(IntentKind.DELEGATE, m.text, prompt=req, name="delegate", label="→ agente")
+
+
+def _delegate_question(m: Match) -> Intent:
+    req = m.original(m.get("req") or m.norm)
+    return Intent(IntentKind.DELEGATE, m.text, prompt=req, name="delegate.question",
+                  label="→ pregunta", delegate_kind="question")  # fmt: skip
 
 
 # --------------------------------------------------------------------------- grammar
@@ -358,10 +365,13 @@ RULES: tuple[Rule, ...] = (
          _open_editor),
     # ---- delegation
     Rule("delegate", R(rf"(?:oye |hey )?{CLAUDE}(?: code)? (?P<req>.+)",
-                       rf"(?:dile|pidele|preguntale|encargale|manda|envia|pregunta)(?: a| al)? (?:{CLAUDE}|agente|el agente)(?: code)? (?:que |a |si )?(?P<req2>.+)",
+                       rf"(?:dile|pidele|encargale|manda|envia)(?: a| al)? (?:{CLAUDE}|agente|el agente)(?: code)? (?:que |a )?(?P<req2>.+)",
+                       rf"(?:preguntale|pregunta|consulta)(?: a| al| con)? (?:{CLAUDE}|agente|el agente)(?: code)? (?:si )?(?P<req5>.+)",
                        r"(?:agente|prompt|tarea para el agente)(?: code)? (?P<req3>.+)",
                        rf"(?:ask|tell) (?:{CLAUDE}|the agent)(?: code)? (?:to )?(?P<req4>.+)"),
          _delegate),
+    # questions without the "claude" prefix ("explícame el recorder", "what is a VAD")
+    Rule("delegate.question", R(rf"(?P<req>(?:{QUESTION_OPENERS}) .+)"), _delegate_question),
 )  # fmt: skip
 
 

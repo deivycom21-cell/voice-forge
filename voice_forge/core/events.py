@@ -93,6 +93,16 @@ class Delegated(Event):
 
 
 @dataclass(frozen=True)
+class Answered(Event):
+    """A question was sent to ``claude -p`` and (maybe) answered."""
+
+    question: str
+    answer: str
+    ok: bool
+    detail: str = ""
+
+
+@dataclass(frozen=True)
 class Blocked(Event):
     intent: Intent
     reasons: tuple[str, ...]

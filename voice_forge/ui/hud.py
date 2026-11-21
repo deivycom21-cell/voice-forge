@@ -10,10 +10,11 @@ import io
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from rich.console import Console, Group, RenderableType
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -57,6 +58,8 @@ class HudState:
     reasons: tuple[str, ...] = ()
     message: str = ""
     output: str = ""
+    answer: bool = False  # output is an answer from claude -p (shown complete, as markdown)
+    output_max_lines: int | None = None  # set by Hud when the answer does not fit the screen
     history: deque[HistoryItem] = field(default_factory=lambda: deque(maxlen=8))
 
     def apply(self, event: ev.Event) -> None:
@@ -80,6 +83,8 @@ class HudState:
             self.reasons = event.reasons
             if intent.kind == IntentKind.EXECUTE:
                 self.command = "$ " + " ".join(intent.argv)
+            elif intent.kind == IntentKind.DELEGATE and intent.delegate_kind == "question":
+                self.command = f"→ pregunta: {intent.prompt or ''}"
             elif intent.kind == IntentKind.DELEGATE:
                 self.command = f"→ {self.target}: prompt ({len(intent.prompt or '')} caracteres)"
             elif intent.kind == IntentKind.UNKNOWN:
@@ -98,6 +103,7 @@ class HudState:
         elif isinstance(event, ev.ActionStarted):
             self.status = Status.EXECUTING
             self.output = ""
+            self._plain_output()
         elif isinstance(event, ev.ActionFinished):
             r = event.result
             self.output = (r.stdout + ("\n" + r.stderr if r.stderr else "")).strip()
@@ -106,7 +112,14 @@ class HudState:
             )
             self.message = detail
             self._push(event.intent.display, r.ok, detail)
+        elif isinstance(event, ev.Answered):
+            self.message = event.detail
+            self.answer = event.ok
+            self.output_max_lines = None
+            self.output = event.answer if event.ok else event.detail
+            self._push("→ claude: pregunta", event.ok, "respondida" if event.ok else event.detail)
         elif isinstance(event, ev.Delegated):
+            self._plain_output()
             self.message = event.detail
             if event.target == "print" or not event.ok:
                 self.output = event.prompt
@@ -121,6 +134,10 @@ class HudState:
         elif isinstance(event, ev.ErrorEvent):
             self.message = f"error en {event.where}: {event.message}"
 
+    def _plain_output(self) -> None:
+        self.answer = False
+        self.output_max_lines = None
+
     def _push(self, label: str, ok: bool | None, detail: str) -> None:
         self.history.appendleft(HistoryItem(time.strftime("%H:%M:%S"), label, ok, detail))
 
@@ -131,6 +148,27 @@ def level_bar(level_db: float, width: int = 24) -> Text:
     bar = Text("▮" * filled, style="green" if frac < 0.8 else "yellow")
     bar.append("▯" * (width - filled), style="grey30")
     return bar
+
+
+ANSWER_TITLE = "salida · respuesta de claude"
+
+
+def answer_panel(answer: str, max_lines: int | None = None) -> Panel:
+    """Panel with the complete answer (markdown), or its head when ``max_lines`` is set."""
+    body: RenderableType
+    if max_lines is None:
+        body = Markdown(answer)
+    else:
+        head = "\n".join(answer.splitlines()[:max_lines])
+        body = Group(
+            Text(head, style="grey85"),
+            Text("… respuesta completa arriba ↑ · voice-forge last", style="italic grey50"),
+        )
+    return Panel(body, title=ANSWER_TITLE, title_align="left", border_style="cyan", padding=(0, 1))
+
+
+def rendered_height(console: Console, renderable: RenderableType) -> int:
+    return len(console.render_lines(renderable, console.options, pad=False))
 
 
 def render(state: HudState) -> RenderableType:
@@ -166,7 +204,9 @@ def render(state: HudState) -> RenderableType:
     if state.message:
         body.add_row("estado", Text(state.message, style="grey74"))
     parts: list[RenderableType] = [header, Panel(body, border_style="grey35", padding=(0, 1))]
-    if state.output:
+    if state.output and state.answer:
+        parts.append(answer_panel(state.output, state.output_max_lines))
+    elif state.output:
         lines = state.output.splitlines()[-10:]
         parts.append(Panel(Text("\n".join(lines), style="grey70"), title="salida", title_align="left",
                            border_style="grey23", padding=(0, 1)))  # fmt: skip
@@ -217,10 +257,26 @@ class Hud:
     def __call__(self, event: ev.Event) -> None:
         with self._lock:
             self.state.apply(event)
+            if isinstance(event, ev.Answered) and event.ok:
+                self._fit_answer()
             if self._live is not None and not isinstance(event, ev.LevelUpdate):
                 self._live.update(render(self.state))
             elif self._live is not None:
                 self._live.update(render(self.state), refresh=False)
+
+    def _fit_answer(self) -> None:
+        """Keep long answers complete: a live display taller than the terminal gets cropped,
+        so when the answer does not fit it is printed in full to the scrollback (above the
+        HUD) and the live panel shows its head."""
+        if self._live is None:
+            return
+        full = answer_panel(self.state.output)
+        others = rendered_height(self.console, render(replace(self.state, output="", answer=False)))
+        if others + rendered_height(self.console, full) <= self.console.height:
+            return
+        self._live.console.print(full)
+        # panel borders (2) + "respuesta completa arriba" note (1) + margin (1)
+        self.state.output_max_lines = max(3, self.console.height - others - 4)
 
     def __enter__(self) -> Hud:
         from rich.live import Live
